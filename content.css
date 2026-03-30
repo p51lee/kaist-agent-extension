@@ -1,0 +1,133 @@
+#krp-time-helper-panel {
+  position: fixed;
+  bottom: 20px;
+  right: 20px;
+  width: min(320px, calc(100vw - 32px));
+  z-index: 2147483647;
+  box-sizing: border-box;
+  border: 1px solid rgba(16, 24, 40, 0.12);
+  border-radius: 16px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(247, 249, 252, 0.98));
+  box-shadow:
+    0 18px 44px rgba(15, 23, 42, 0.18),
+    0 4px 12px rgba(15, 23, 42, 0.08);
+  color: #152238;
+  font-family:
+    "Pretendard Variable",
+    "Pretendard",
+    "Noto Sans KR",
+    "Apple SD Gothic Neo",
+    sans-serif;
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+}
+
+#krp-time-helper-panel.krp-time-helper--minimized {
+  width: auto;
+}
+
+#krp-time-helper-panel *,
+#krp-time-helper-panel *::before,
+#krp-time-helper-panel *::after {
+  box-sizing: border-box;
+}
+
+.krp-time-helper__inner {
+  padding: 10px 12px 12px;
+}
+
+.krp-time-helper__controls {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.krp-time-helper__control {
+  appearance: none;
+  border: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 8px;
+  background: #e7edf5;
+  color: #44516b;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 0;
+}
+
+.krp-time-helper__control:hover {
+  background: #d6e0ec;
+}
+
+.krp-time-helper__control:focus-visible {
+  outline: 2px solid #0f7b6c;
+  outline-offset: 2px;
+}
+
+.krp-time-helper__section {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(16, 24, 40, 0.08);
+}
+
+.krp-time-helper__section:first-of-type {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.krp-time-helper__row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.krp-time-helper__row:first-child {
+  margin-top: 0;
+}
+
+.krp-time-helper__row--emphasis .krp-time-helper__label,
+.krp-time-helper__row--emphasis .krp-time-helper__value {
+  font-weight: 800;
+}
+
+.krp-time-helper__label {
+  min-width: 0;
+  color: #44516b;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.krp-time-helper__value {
+  flex-shrink: 0;
+  color: #0f7b6c;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.krp-time-helper__value--muted {
+  color: #667085;
+  font-weight: 600;
+}
+
+.krp-time-helper__empty {
+  margin: 0;
+  color: #667085;
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+@media (max-width: 860px) {
+  #krp-time-helper-panel {
+    right: 12px;
+    bottom: 12px;
+    left: 12px;
+    width: auto;
+  }
+}

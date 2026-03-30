@@ -1,0 +1,20 @@
+{
+  "manifest_version": 3,
+  "name": "KRP Weekly Time Helper",
+  "version": "0.1.0",
+  "description": "Shows weekly remaining-work averages and finish-time predictions on the KRP home page.",
+  "content_scripts": [
+    {
+      "matches": [
+        "https://krp.kaist.ac.kr/krp/main_page/home*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "content.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}
