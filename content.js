@@ -390,7 +390,11 @@
       })
     );
 
-    titlebar.appendChild(trafficLights);
+    const title = document.createElement("div");
+    title.className = "krp-time-helper__title";
+    title.textContent = "github.com/p51lee/kaist-agent-extension";
+
+    titlebar.append(trafficLights, title);
     return titlebar;
   }
 
@@ -454,6 +458,11 @@
 
       inner.appendChild(predictionSection);
     }
+
+    const message = document.createElement("div");
+    message.className = "krp-time-helper__message";
+    message.textContent = "전문연 화이팅";
+    inner.appendChild(message);
 
     panel.appendChild(inner);
   }

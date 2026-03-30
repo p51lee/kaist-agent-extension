@@ -70,6 +70,18 @@
   gap: 8px;
 }
 
+.krp-time-helper__title {
+  max-width: calc(100% - 72px);
+  overflow: hidden;
+  color: rgba(68, 81, 107, 0.92);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: none;
+}
+
 .krp-time-helper__control {
   appearance: none;
   position: relative;
@@ -172,6 +184,14 @@
   color: #667085;
   font-size: 13px;
   line-height: 1.5;
+}
+
+.krp-time-helper__message {
+  margin-top: 14px;
+  color: rgba(68, 81, 107, 0.9);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
 }
 
 @media (max-width: 860px) {

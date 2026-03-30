@@ -16,7 +16,7 @@ The panel reads the existing KRP page and shows:
 1. Open `chrome://extensions`
 2. Enable `Developer mode`
 3. Click `Load unpacked`
-4. Select this directory: `/Users/p51lee/dev/agent-extension`
+4. Select this extension folder
 5. Open or refresh `https://krp.kaist.ac.kr/krp/main_page/home`
 
 ## Data Sources
