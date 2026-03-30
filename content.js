@@ -9,8 +9,11 @@
     [19 * 60, 24 * 60]
   ];
   const DAILY_COUNT_LIMIT_MINUTES = 12 * 60;
+  const PANEL_EDGE_MARGIN = 16;
+  const PANEL_VERTICAL_MARGIN = 8;
   let panelClosed = false;
   let panelMinimized = false;
+  let panelPosition = null;
 
   function parseDuration(text) {
     if (!text) {
@@ -161,6 +164,25 @@
     return null;
   }
 
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  function getPanelMaxCoordinates(panel) {
+    return {
+      left: Math.max(PANEL_EDGE_MARGIN, window.innerWidth - panel.offsetWidth - PANEL_EDGE_MARGIN),
+      top: Math.max(PANEL_VERTICAL_MARGIN, window.innerHeight - panel.offsetHeight - PANEL_VERTICAL_MARGIN)
+    };
+  }
+
+  function getSnappedLeft(panel, side) {
+    if (side === "left") {
+      return PANEL_EDGE_MARGIN;
+    }
+
+    return getPanelMaxCoordinates(panel).left;
+  }
+
   function getTrimmedText(selector, rootDocument) {
     const element = rootDocument.querySelector(selector);
     return element ? element.textContent.trim() : "";
@@ -246,19 +268,130 @@
     return paragraph;
   }
 
-  function buildControlButton(label, title, onClick) {
+  function buildControlButton(options) {
     const button = document.createElement("button");
     button.type = "button";
-    button.className = "krp-time-helper__control";
-    button.textContent = label;
-    button.title = title;
-    button.setAttribute("aria-label", title);
+    button.className = `krp-time-helper__control ${options.className}`;
+    button.title = options.title;
+    button.setAttribute("aria-label", options.title);
+    button.dataset.symbol = options.symbol;
     button.addEventListener("click", function (event) {
       event.preventDefault();
       event.stopPropagation();
-      onClick();
+      options.onClick();
     });
     return button;
+  }
+
+  function applyPanelPosition(panel) {
+    if (panelPosition) {
+      const maxCoordinates = getPanelMaxCoordinates(panel);
+      const top = clamp(panelPosition.top, PANEL_VERTICAL_MARGIN, maxCoordinates.top);
+      const left =
+        panelPosition.mode === "snapped"
+          ? getSnappedLeft(panel, panelPosition.side)
+          : clamp(panelPosition.left, PANEL_EDGE_MARGIN, maxCoordinates.left);
+
+      panel.style.left = `${left}px`;
+      panel.style.top = `${top}px`;
+      panel.style.right = "auto";
+      panel.style.bottom = "auto";
+      return;
+    }
+
+    panel.style.removeProperty("left");
+    panel.style.removeProperty("top");
+    panel.style.removeProperty("right");
+    panel.style.removeProperty("bottom");
+  }
+
+  function startDragging(panel, pointerDownEvent) {
+    if (pointerDownEvent.button !== 0) {
+      return;
+    }
+
+    pointerDownEvent.preventDefault();
+
+    const rect = panel.getBoundingClientRect();
+    const offsetX = pointerDownEvent.clientX - rect.left;
+    const offsetY = pointerDownEvent.clientY - rect.top;
+
+    panel.classList.add("krp-time-helper--dragging");
+
+    function handlePointerMove(moveEvent) {
+      const maxCoordinates = getPanelMaxCoordinates(panel);
+
+      panelPosition = {
+        mode: "free",
+        left: clamp(moveEvent.clientX - offsetX, PANEL_EDGE_MARGIN, maxCoordinates.left),
+        top: clamp(moveEvent.clientY - offsetY, PANEL_VERTICAL_MARGIN, maxCoordinates.top)
+      };
+
+      applyPanelPosition(panel);
+    }
+
+    function stopDragging() {
+      panel.classList.remove("krp-time-helper--dragging");
+      const currentRect = panel.getBoundingClientRect();
+      const maxCoordinates = getPanelMaxCoordinates(panel);
+      const side =
+        currentRect.left + (currentRect.width / 2) < (window.innerWidth / 2) ? "left" : "right";
+
+      panelPosition = {
+        mode: "snapped",
+        side,
+        top: clamp(currentRect.top, PANEL_VERTICAL_MARGIN, maxCoordinates.top)
+      };
+      applyPanelPosition(panel);
+      window.removeEventListener("pointermove", handlePointerMove);
+      window.removeEventListener("pointerup", stopDragging);
+      window.removeEventListener("pointercancel", stopDragging);
+    }
+
+    window.addEventListener("pointermove", handlePointerMove);
+    window.addEventListener("pointerup", stopDragging);
+    window.addEventListener("pointercancel", stopDragging);
+  }
+
+  function buildTitlebar(panel) {
+    const titlebar = document.createElement("div");
+    titlebar.className = "krp-time-helper__titlebar";
+    titlebar.addEventListener("pointerdown", function (event) {
+      if (event.target.closest(".krp-time-helper__control")) {
+        return;
+      }
+
+      startDragging(panel, event);
+    });
+
+    const trafficLights = document.createElement("div");
+    trafficLights.className = "krp-time-helper__traffic-lights";
+    trafficLights.append(
+      buildControlButton({
+        className: "krp-time-helper__control--close",
+        title: "Close panel",
+        symbol: "×",
+        onClick: function () {
+          panelClosed = true;
+          const existingPanel = document.getElementById(PANEL_ID);
+          if (existingPanel) {
+            existingPanel.remove();
+          }
+        }
+      }),
+      buildControlButton({
+        className: "krp-time-helper__control--minimize",
+        title: panelMinimized ? "Expand panel" : "Minimize panel",
+        symbol: panelMinimized ? "+" : "−",
+        onClick: function () {
+          panelMinimized = !panelMinimized;
+          render();
+        }
+      })
+    );
+
+    titlebar.appendChild(trafficLights);
+    return titlebar;
   }
 
   function renderPanel(data) {
@@ -270,36 +403,17 @@
     }
 
     panel.classList.toggle("krp-time-helper--minimized", panelMinimized);
+    applyPanelPosition(panel);
     panel.textContent = "";
+
+    panel.appendChild(buildTitlebar(panel));
+
+    if (panelMinimized) {
+      return;
+    }
 
     const inner = document.createElement("div");
     inner.className = "krp-time-helper__inner";
-
-    const controls = document.createElement("div");
-    controls.className = "krp-time-helper__controls";
-    controls.append(
-      buildControlButton(
-        panelMinimized ? "+" : "-",
-        panelMinimized ? "Expand panel" : "Minimize panel",
-        function () {
-          panelMinimized = !panelMinimized;
-          render();
-        }
-      ),
-      buildControlButton("×", "Close panel", function () {
-        panelClosed = true;
-        const existingPanel = document.getElementById(PANEL_ID);
-        if (existingPanel) {
-          existingPanel.remove();
-        }
-      })
-    );
-    inner.appendChild(controls);
-
-    if (panelMinimized) {
-      panel.appendChild(inner);
-      return;
-    }
 
     const averageSection = document.createElement("section");
     averageSection.className = "krp-time-helper__section";
@@ -401,6 +515,11 @@
   function init() {
     render();
     startObservers();
+    window.addEventListener("resize", function () {
+      if (panelPosition) {
+        render();
+      }
+    });
     window.setInterval(render, 60 * 1000);
   }
 
