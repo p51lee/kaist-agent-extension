@@ -186,6 +186,66 @@
   line-height: 1.5;
 }
 
+.krp-time-helper__details-toggle {
+  appearance: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 0 0 6px;
+  border: 1px solid rgba(16, 24, 40, 0.12);
+  border-radius: 999px;
+  background: rgba(246, 248, 251, 0.94);
+  color: #44516b;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+  padding: 5px 8px;
+}
+
+.krp-time-helper__details-toggle:hover {
+  background: rgba(235, 240, 247, 0.96);
+}
+
+.krp-time-helper__details-toggle:focus-visible {
+  outline: 2px solid #0f7b6c;
+  outline-offset: 2px;
+}
+
+.krp-time-helper__details {
+  margin-top: 10px;
+  padding: 10px;
+  border: 1px solid rgba(16, 24, 40, 0.08);
+  border-radius: 8px;
+  background: rgba(249, 250, 252, 0.92);
+}
+
+.krp-time-helper__detail-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 6px;
+}
+
+.krp-time-helper__detail-row:first-child {
+  margin-top: 0;
+}
+
+.krp-time-helper__detail-label {
+  color: #667085;
+  font-size: 11px;
+  line-height: 1.35;
+}
+
+.krp-time-helper__detail-value {
+  flex-shrink: 0;
+  color: #30405d;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
 .krp-time-helper__message {
   margin-top: 14px;
   color: rgba(68, 81, 107, 0.9);

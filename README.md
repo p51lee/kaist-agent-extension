@@ -7,6 +7,7 @@ Chrome MV3 extension that injects a floating helper panel on:
 The panel reads the existing KRP page and shows:
 
 - Remaining average counted work time for the rest of the week
+- A `상세` button that explains the inferred holiday calculation
 - If you are checked in and not yet checked out:
   - Finish time to complete the weekly `40H` target today, when possible
   - Finish times for adding `6H` through `12H` counted work today, omitting impossible cases

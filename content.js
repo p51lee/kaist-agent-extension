@@ -14,6 +14,7 @@
   const PANEL_VERTICAL_MARGIN = 8;
   let panelClosed = false;
   let panelMinimized = false;
+  let detailsVisible = false;
   let panelPosition = null;
 
   function parseDuration(text) {
@@ -282,11 +283,22 @@
     return parseCalendarEntryCreditedMinutes(text);
   }
 
-  function inferHolidayAdjustedWeekdaysLeft(rootDocument, remainingMinutes) {
+  function inferHolidayDetails(rootDocument, remainingMinutes) {
     const weekdaysLeft = countWeekdaysLeft(rootDocument);
     const weekContext = getCurrentWeekContext(rootDocument);
     if (!weekContext || remainingMinutes == null || weekdaysLeft == null) {
-      return weekdaysLeft;
+      return {
+        available: false,
+        adjustedWeekdaysLeft: weekdaysLeft,
+        calendarWeekdaysLeft: weekdaysLeft,
+        futureHolidayCount: null,
+        holidayCount: null,
+        pastHolidayCount: null,
+        pastNoWorkdayCount: null,
+        remainingMinutes,
+        weeklyRequiredMinutes: null,
+        workedMinutesBeforeToday: null
+      };
     }
 
     let workedMinutesBeforeToday = 0;
@@ -306,8 +318,24 @@
     const holidayCount = clamp(Math.round(rawHolidayCount), 0, 5);
     const pastHolidayCount = Math.min(holidayCount, pastNoWorkdayCount);
     const futureHolidayCount = holidayCount - pastHolidayCount;
+    const adjustedWeekdaysLeft = Math.max(0, weekdaysLeft - futureHolidayCount);
 
-    return Math.max(0, weekdaysLeft - futureHolidayCount);
+    return {
+      available: true,
+      adjustedWeekdaysLeft,
+      calendarWeekdaysLeft: weekdaysLeft,
+      futureHolidayCount,
+      holidayCount,
+      pastHolidayCount,
+      pastNoWorkdayCount,
+      remainingMinutes,
+      weeklyRequiredMinutes,
+      workedMinutesBeforeToday
+    };
+  }
+
+  function inferHolidayAdjustedWeekdaysLeft(rootDocument, remainingMinutes) {
+    return inferHolidayDetails(rootDocument, remainingMinutes).adjustedWeekdaysLeft;
   }
 
   function clamp(value, min, max) {
@@ -341,7 +369,8 @@
 
     const remainingMinutes = parseDuration(remainingText);
     const startMinutes = parseClockTime(startText);
-    const weekdaysLeft = inferHolidayAdjustedWeekdaysLeft(rootDocument, remainingMinutes);
+    const holidayDetails = inferHolidayDetails(rootDocument, remainingMinutes);
+    const weekdaysLeft = holidayDetails.adjustedWeekdaysLeft;
     const averageMinutes =
       remainingMinutes != null && weekdaysLeft != null && weekdaysLeft > 0
         ? Math.ceil(remainingMinutes / weekdaysLeft)
@@ -376,6 +405,7 @@
       checkedIn,
       endText,
       goalFinishMinutes,
+      holidayDetails,
       predictions,
       remainingMinutes,
       remainingText,
@@ -395,6 +425,9 @@
     const labelNode = document.createElement("div");
     labelNode.className = "krp-time-helper__label";
     labelNode.textContent = label;
+    if (options && options.labelExtra) {
+      labelNode.appendChild(options.labelExtra);
+    }
 
     const valueNode = document.createElement("div");
     valueNode.className = "krp-time-helper__value";
@@ -412,6 +445,63 @@
     paragraph.className = "krp-time-helper__empty";
     paragraph.textContent = text;
     return paragraph;
+  }
+
+  function buildDetailsToggle() {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "krp-time-helper__details-toggle";
+    button.textContent = detailsVisible ? "상세 숨기기" : "상세";
+    button.addEventListener("click", function (event) {
+      event.preventDefault();
+      event.stopPropagation();
+      detailsVisible = !detailsVisible;
+      render();
+    });
+    return button;
+  }
+
+  function buildDetailRow(label, value) {
+    const row = document.createElement("div");
+    row.className = "krp-time-helper__detail-row";
+
+    const labelNode = document.createElement("span");
+    labelNode.className = "krp-time-helper__detail-label";
+    labelNode.textContent = label;
+
+    const valueNode = document.createElement("span");
+    valueNode.className = "krp-time-helper__detail-value";
+    valueNode.textContent = value;
+
+    row.append(labelNode, valueNode);
+    return row;
+  }
+
+  function formatDetailDuration(minutes) {
+    return minutes == null ? "-" : formatDuration(minutes);
+  }
+
+  function buildDetailsPanel(details) {
+    const panel = document.createElement("div");
+    panel.className = "krp-time-helper__details";
+
+    if (!details || !details.available) {
+      panel.appendChild(buildEmpty("달력 기반 추론 정보를 읽을 수 없습니다."));
+      return panel;
+    }
+
+    panel.append(
+      buildDetailRow("인정 시간(전일)", formatDetailDuration(details.workedMinutesBeforeToday)),
+      buildDetailRow("잔여 시간", formatDetailDuration(details.remainingMinutes)),
+      buildDetailRow("주간 필요시간", formatDetailDuration(details.weeklyRequiredMinutes)),
+      buildDetailRow("달력상 남은 평일", `${details.calendarWeekdaysLeft}일`),
+      buildDetailRow("추론 휴일", `${details.holidayCount}일`),
+      buildDetailRow("이미 지난 휴일", `${details.pastHolidayCount}일`),
+      buildDetailRow("앞으로 휴일", `${details.futureHolidayCount}일`),
+      buildDetailRow("보정 후 남은 평일", `${details.adjustedWeekdaysLeft}일`)
+    );
+
+    return panel;
   }
 
   function buildControlButton(options) {
@@ -570,8 +660,15 @@
 
     if (data.averageMinutes != null) {
       averageSection.appendChild(
-        buildRow("남은 평일 평균 필요 시간", formatDuration(data.averageMinutes))
+        buildRow(
+          "남은 평일 평균 필요 시간",
+          formatDuration(data.averageMinutes),
+          { labelExtra: buildDetailsToggle() }
+        )
       );
+      if (detailsVisible) {
+        averageSection.appendChild(buildDetailsPanel(data.holidayDetails));
+      }
     } else {
       averageSection.appendChild(buildEmpty("평균 시간을 계산할 수 없습니다."));
     }
@@ -696,6 +793,7 @@
       formatClockTime,
       formatDuration,
       inferHolidayAdjustedWeekdaysLeft,
+      inferHolidayDetails,
       parseCalendarEntryCreditedMinutes,
       parseAttendanceWorkedMinutes,
       parseClockTime,
