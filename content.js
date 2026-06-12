@@ -8,6 +8,7 @@
     [13 * 60, 18 * 60],
     [19 * 60, 24 * 60]
   ];
+  const CREDIT_KEYWORDS = /출장|휴가|연가|공가|시간연차|유급|대체휴가/;
   const DAILY_COUNT_LIMIT_MINUTES = 12 * 60;
   const PANEL_EDGE_MARGIN = 16;
   const PANEL_VERTICAL_MARGIN = 8;
@@ -108,18 +109,9 @@
   }
 
   function countWeekdaysLeft(rootDocument) {
-    const todayMarker = rootDocument.querySelector(".fc_day_top p.today");
-    if (todayMarker) {
-      const currentCell = todayMarker.closest(".fc_event_container");
-      const weekContainer = todayMarker.closest(".fc_bg");
-
-      if (currentCell && weekContainer) {
-        const cells = [...weekContainer.querySelectorAll(".fc_event_container")];
-        const currentIndex = cells.indexOf(currentCell);
-        if (currentIndex >= 0) {
-          return cells.length - currentIndex;
-        }
-      }
+    const weekContext = getCurrentWeekContext(rootDocument);
+    if (weekContext) {
+      return weekContext.cells.length - weekContext.currentIndex;
     }
 
     const dayOfWeek = new Date().getDay();
@@ -128,6 +120,30 @@
     }
 
     return null;
+  }
+
+  function getCurrentWeekContext(rootDocument) {
+    const todayMarker = rootDocument.querySelector(".fc_day_top p.today");
+    if (!todayMarker) {
+      return null;
+    }
+
+    const currentCell = todayMarker.closest(".fc_event_container");
+    const weekContainer = todayMarker.closest(".fc_bg");
+    if (!currentCell || !weekContainer) {
+      return null;
+    }
+
+    const cells = [...weekContainer.querySelectorAll(".fc_event_container")];
+    const currentIndex = cells.indexOf(currentCell);
+    if (currentIndex < 0) {
+      return null;
+    }
+
+    return {
+      cells,
+      currentIndex
+    };
   }
 
   function addCountedMinutes(startTimeMinutes, targetMinutes) {
@@ -164,6 +180,136 @@
     return null;
   }
 
+  function countWorkedMinutes(startTimeMinutes, endTimeMinutes) {
+    if (
+      typeof startTimeMinutes !== "number" ||
+      Number.isNaN(startTimeMinutes) ||
+      typeof endTimeMinutes !== "number" ||
+      Number.isNaN(endTimeMinutes)
+    ) {
+      return null;
+    }
+
+    const normalizedEnd =
+      endTimeMinutes === 0 && startTimeMinutes > 0 ? 24 * 60 : endTimeMinutes;
+    if (normalizedEnd <= startTimeMinutes) {
+      return null;
+    }
+
+    let totalMinutes = 0;
+    for (const [windowStart, windowEnd] of COUNTED_WINDOWS) {
+      const countedStart = Math.max(startTimeMinutes, windowStart);
+      const countedEnd = Math.min(normalizedEnd, windowEnd);
+      if (countedEnd > countedStart) {
+        totalMinutes += countedEnd - countedStart;
+      }
+    }
+
+    return Math.min(totalMinutes, DAILY_COUNT_LIMIT_MINUTES);
+  }
+
+  function parseTimeRanges(text) {
+    const ranges = [];
+    const normalized = String(text);
+    const rangePattern = /(\d{1,2}:\d{2})\s*~\s*(?:[^\d\s]+\s*)?(\d{1,2}:\d{2})/g;
+
+    for (const match of normalized.matchAll(rangePattern)) {
+      const startMinutes = parseClockTime(match[1]);
+      const endMinutes = parseClockTime(match[2]);
+      const workedMinutes = countWorkedMinutes(startMinutes, endMinutes);
+      if (workedMinutes != null) {
+        ranges.push(workedMinutes);
+      }
+    }
+
+    return ranges;
+  }
+
+  function parseCalendarEntryCreditedMinutes(text) {
+    if (!text) {
+      return null;
+    }
+
+    const normalized = String(text).replace(/\s+/g, " ").trim();
+    if (!normalized) {
+      return null;
+    }
+
+    const isAttendance = /출근/.test(normalized) && /퇴근/.test(normalized);
+    const isCreditedAbsence = CREDIT_KEYWORDS.test(normalized);
+    if (!isAttendance && !isCreditedAbsence) {
+      return null;
+    }
+
+    const rangedMinutes = parseTimeRanges(normalized);
+    if (rangedMinutes.length) {
+      return Math.min(
+        rangedMinutes.reduce(function (sum, minutes) {
+          return sum + minutes;
+        }, 0),
+        DAILY_COUNT_LIMIT_MINUTES
+      );
+    }
+
+    return isCreditedAbsence ? 8 * 60 : null;
+  }
+
+  function countCellCreditedMinutes(cell) {
+    const entryNodes =
+      typeof cell.querySelectorAll === "function"
+        ? [...cell.querySelectorAll(".fc_content .con, .con")]
+        : [];
+    const entryTexts = entryNodes.length
+      ? entryNodes.map(function (node) {
+          return node.textContent;
+        })
+      : [cell.textContent];
+
+    let totalMinutes = 0;
+    let hasCreditedEntry = false;
+    for (const text of entryTexts) {
+      const creditedMinutes = parseCalendarEntryCreditedMinutes(text);
+      if (creditedMinutes != null) {
+        totalMinutes += creditedMinutes;
+        hasCreditedEntry = true;
+      }
+    }
+
+    return hasCreditedEntry ? Math.min(totalMinutes, DAILY_COUNT_LIMIT_MINUTES) : null;
+  }
+
+  function parseAttendanceWorkedMinutes(text) {
+    return parseCalendarEntryCreditedMinutes(text);
+  }
+
+  function inferHolidayAdjustedWeekdaysLeft(rootDocument, remainingMinutes) {
+    const weekdaysLeft = countWeekdaysLeft(rootDocument);
+    const weekContext = getCurrentWeekContext(rootDocument);
+    if (!weekContext || remainingMinutes == null || weekdaysLeft == null) {
+      return weekdaysLeft;
+    }
+
+    let workedMinutesBeforeToday = 0;
+    let pastNoWorkdayCount = 0;
+    const pastCells = weekContext.cells.slice(0, weekContext.currentIndex);
+    for (const cell of pastCells) {
+      const creditedMinutes = countCellCreditedMinutes(cell);
+      if (creditedMinutes == null) {
+        pastNoWorkdayCount += 1;
+      } else {
+        workedMinutesBeforeToday += creditedMinutes;
+      }
+    }
+
+    const weeklyRequiredMinutes = workedMinutesBeforeToday + remainingMinutes;
+    const rawHolidayCount = (40 * 60 - weeklyRequiredMinutes) / (8 * 60);
+    const holidayCount = clamp(Math.round(rawHolidayCount), 0, 5);
+    const pastHolidayCount = Math.min(holidayCount, pastNoWorkdayCount);
+    const futureHolidayCount = holidayCount - pastHolidayCount;
+
+    return Math.max(0, weekdaysLeft - futureHolidayCount);
+  }
+
   function clamp(value, min, max) {
     return Math.min(Math.max(value, min), max);
   }
@@ -195,7 +341,7 @@
 
     const remainingMinutes = parseDuration(remainingText);
     const startMinutes = parseClockTime(startText);
-    const weekdaysLeft = countWeekdaysLeft(rootDocument);
+    const weekdaysLeft = inferHolidayAdjustedWeekdaysLeft(rootDocument, remainingMinutes);
     const averageMinutes =
       remainingMinutes != null && weekdaysLeft != null && weekdaysLeft > 0
         ? Math.ceil(remainingMinutes / weekdaysLeft)
@@ -392,7 +538,7 @@
 
     const title = document.createElement("div");
     title.className = "krp-time-helper__title";
-    title.textContent = "github.com/p51lee/kaist-agent-extension";
+    title.textContent = "https://github.com/p51lee/kaist-agent-extension";
 
     titlebar.append(trafficLights, title);
     return titlebar;
@@ -545,8 +691,13 @@
       addCountedMinutes,
       collectPageData,
       countWeekdaysLeft,
+      countCellCreditedMinutes,
+      countWorkedMinutes,
       formatClockTime,
       formatDuration,
+      inferHolidayAdjustedWeekdaysLeft,
+      parseCalendarEntryCreditedMinutes,
+      parseAttendanceWorkedMinutes,
       parseClockTime,
       parseDuration
     };

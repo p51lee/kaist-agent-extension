@@ -29,8 +29,12 @@ The panel reads the existing KRP page and shows:
 ## Calculation Rules
 
 - `금주 잔여 복무시간` is treated as the authoritative remaining weekly target.
+- Weekday holidays are inferred from current-week calendar entries.
+- Credited time before today includes actual attendance, business trips, and paid leave/holiday entries shown on the calendar.
+  - `worked_minutes_before_today + remaining_minutes = inferred_weekly_required_minutes`
+  - `holiday_count = round((40H - inferred_weekly_required_minutes) / 8H)`
 - Remaining average time is:
-  - `ceil(remaining_minutes / weekdays_left_including_today)`
+  - `ceil(remaining_minutes / holiday_adjusted_weekdays_left_including_today)`
 - Counted work windows are:
   - `06:00-12:00`
   - `13:00-18:00`
@@ -46,5 +50,5 @@ The panel reads the existing KRP page and shows:
 ## Notes
 
 - If the calendar `today` marker is missing, the extension falls back to the browser weekday.
-- Weekdays-left counting assumes Monday through Friday only.
-- Holidays, leave, and special schedules are not modeled separately.
+- Weekdays-left counting assumes Monday through Friday only, then subtracts inferred holidays that have not already passed.
+- Other leave and special schedules are not modeled separately.
